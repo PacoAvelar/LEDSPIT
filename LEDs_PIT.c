@@ -273,7 +273,7 @@ int main(void) {
     	if(TRUE == estado_actual->cambiar){
     		if(NO_CONGELADO == estado_actual->bandera_congelado){
     		    		if(COLOR_SIGUIENTE == estado_actual->bandera_siguiente){
-    		    			estado_actual = estado_actual->bandera_siguiente;
+    		    			estado_actual = estado_actual->estado_siguiente;
     		    		}else{
     		    			estado_actual = estado_actual->estado_anterior;
     		    		}
