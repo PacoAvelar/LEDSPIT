@@ -44,7 +44,7 @@
 
 #define LED_RED_PIN 22
 #define LED_BLUE_PIN 21
-#define LED_GREEN_PIN 20
+#define LED_GREEN_PIN 26
 #define LED_BLUE_PORT PORTB
 #define LED_RED_PORT PORTB
 #define LED_GREEN_PORT PORTE
@@ -100,19 +100,15 @@ static volatile color color_azul = { LED_OFF, LED_OFF, LED_ON, };
 
 static volatile color color_verde = { LED_OFF, LED_ON, LED_OFF, };
 
-void encender_led(estado Estado)
-{
-    GPIO_PinWrite(GPIOB, LED_RED_PIN, Estado.color_del_led.led_rojo);
-    GPIO_PinWrite(GPIOB, LED_BLUE_PIN, Estado.color_del_led.led_azul);
-    GPIO_PinWrite(GPIOE, LED_GREEN_PIN, Estado.color_del_led.led_verde);
-}
 
 static estado * estado_actual = 0;
 
+
+void encender_led(estado Estado);
 void PORTA_IRQHandler()
 {
     GPIO_ClearPinsInterruptFlags(GPIOA, SW2_INTERRUPT_FLAG_PIN);
-    if(NO_CONGELADO == estado_actual->bandera_congelado){
+   if(NO_CONGELADO == estado_actual->bandera_congelado){
 	    estado_actual->bandera_congelado = CONGELADO;
    }
    else
@@ -133,11 +129,13 @@ void PORTC_IRQHandler()
     }
 
 }
+static uint32_t clock_fq = 0;
 
 void PIT0_IRQHandler()
 {
     PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
     estado_actual->cambiar = TRUE;
+    PIT_SetTimerPeriod(PIT, kPIT_Chnl_0, clock_fq);
     PIT_StartTimer(PIT, kPIT_Chnl_0);
 }
 
@@ -204,6 +202,12 @@ int main(void)
     PORT_SetPinConfig(LED_RED_PORT, LED_RED_PIN, &config_red_led);
     PORT_SetPinConfig(LED_GREEN_PORT, LED_GREEN_PIN, &config_green_led);
 
+	gpio_pin_config_t led_config = { kGPIO_DigitalOutput, 1, };
+	/* Sets the configuration
+	 */
+	GPIO_PinInit(GPIOB, LED_BLUE_PIN, &led_config);
+	GPIO_PinInit(GPIOB, LED_RED_PIN, &led_config);
+	GPIO_PinInit(GPIOE, LED_GREEN_PIN, &led_config);
     /*
      * Configuración de los botones.
      */
@@ -221,6 +225,13 @@ int main(void)
     PORT_SetPinConfig(SW2_PORT, SW2_PIN, &config_SW2);
     PORT_SetPinConfig(SW3_PORT, SW3_PIN, &config_SW3);
 
+
+	gpio_pin_config_t switch_config = { kGPIO_DigitalInput, 1, };
+	GPIO_PinInit(GPIOA, SW2_PIN, &switch_config);
+	GPIO_PinInit(GPIOC,SW3_PIN, &switch_config);
+
+	PORT_SetPinInterruptConfig(PORTA, 4, kPORT_InterruptFallingEdge);
+	PORT_SetPinInterruptConfig(PORTC, 6, kPORT_InterruptFallingEdge);
     /*
      * Congifuracion del PIT 0
      */
@@ -229,13 +240,15 @@ int main(void)
     PIT_GetDefaultConfig(&config_pit_0);
     CLOCK_EnableClock(kCLOCK_Pit0);
     PIT_Init(PIT, &config_pit_0);
-    uint32_t clock_fq = CLOCK_GetFreq(kCLOCK_Pit0);
+
+    clock_fq = CLOCK_GetBusClkFreq() ;
     uint8_t seconds = 1;
     uint32_t pit_0_clock_counts = ((uint32_t) seconds) * clock_fq;
     PIT_SetTimerPeriod(PIT, kPIT_Chnl_0, pit_0_clock_counts);
     PIT_EnableInterrupts(PIT, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
     PIT_StartTimer(PIT, kPIT_Chnl_0);
     EnableIRQ(PIT0_IRQn);
+
 
     NVIC_EnableIRQ(PORTA_IRQn);
     NVIC_EnableIRQ(PORTC_IRQn);
@@ -249,9 +262,11 @@ int main(void)
                 if (COLOR_SIGUIENTE == estado_actual->bandera_siguiente)
                 {
                     estado_actual = estado_actual->estado_siguiente;
+                    estado_actual->bandera_siguiente = COLOR_SIGUIENTE;
                 } else
                 {
                     estado_actual = estado_actual->estado_anterior;
+                    estado_actual->bandera_siguiente = COLOR_ANTERIOR;
                 }
                 encender_led(*estado_actual);
             }
@@ -261,3 +276,11 @@ int main(void)
     }
     return 0;
 }
+
+void encender_led(estado Estado)
+{
+	GPIO_WritePinOutput(GPIOB, LED_RED_PIN, Estado.color_del_led.led_rojo);
+	GPIO_WritePinOutput(GPIOB, LED_BLUE_PIN, Estado.color_del_led.led_azul);
+	GPIO_WritePinOutput(GPIOE, LED_GREEN_PIN, Estado.color_del_led.led_verde);
+}
+
