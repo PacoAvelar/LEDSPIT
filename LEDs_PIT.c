@@ -65,7 +65,7 @@
 
 
 enum {LED_ON, LED_OFF};
-
+enum {FALSE, TRUE};
 typedef struct color {
 	uint8_t led_rojo;
 	uint8_t led_verde;
@@ -78,6 +78,7 @@ typedef struct  {
 	struct estado* estado_anterior;
 	struct color color_del_led;
 	struct estado* estado_siguiente;
+	uint8_t cambiar;
 }estado;
 
 enum {COLOR_SIGUIENTE, COLOR_ANTERIOR};
@@ -125,6 +126,13 @@ static volatile color color_verde ={
  	}
 
  }
+
+ void PIT0_IRQHandler (){
+	 PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
+	 estado_actual->cambiar = TRUE;
+	 PIT_StartTimer(PIT, kPIT_Chnl_0);
+ }
+
 int main(void) {
 	 estado estado_rojo ;
 
@@ -140,13 +148,14 @@ int main(void) {
 	estado_rojo.estado_anterior =	&estado_verde;
 	estado_rojo.color_del_led =		color_rojo;
 	estado_rojo.estado_siguiente =	&estado_azul;
-
+	estado_rojo.cambiar = FALSE;
 
 	estado_azul.bandera_congelado = NO_CONGELADO;
 	estado_azul.bandera_siguiente =  COLOR_SIGUIENTE;
 	estado_azul.estado_anterior =	&estado_rojo;
 	estado_azul.color_del_led =		color_azul;
 	estado_azul.estado_siguiente =	&estado_verde;
+	estado_azul.cambiar = FALSE;
 
 
 	estado_verde.bandera_congelado = NO_CONGELADO;
@@ -154,7 +163,9 @@ int main(void) {
 	estado_verde.estado_anterior =	&estado_azul;
 	estado_verde.color_del_led =		color_verde;
 	estado_verde.estado_siguiente =	&estado_rojo;
+	estado_verde.cambiar = FALSE;
 
+	estado_actual = &estado_rojo;
   	/* Init board hardware. */
     BOARD_InitBootPins();
     BOARD_InitBootClocks();
@@ -251,20 +262,26 @@ int main(void) {
    uint32_t pit_0_clock_counts = ((uint32_t) seconds ) * clock_fq;
    PIT_SetTimerPeriod(PIT, kPIT_Chnl_0, pit_0_clock_counts);
    PIT_EnableInterrupts(PIT, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
+   PIT_StartTimer(PIT, kPIT_Chnl_0);
+   EnableIRQ(PIT0_IRQn);
 
-
-	  estado_actual = &estado_rojo;
+	NVIC_EnableIRQ(PORTA_IRQn);
+	NVIC_EnableIRQ(PORTC_IRQn);
 
 
     for(;;)	{
-    	if(NO_CONGELADO == estado_actual->bandera_congelado){
-    		if(COLOR_SIGUIENTE == estado_actual->bandera_siguiente){
-    			estado_actual = estado_actual->bandera_siguiente;
-    		}else{
-    			estado_actual = estado_actual->estado_anterior;
-    		}
-    		encender_led(*estado_actual);
+    	if(TRUE == estado_actual->cambiar){
+    		if(NO_CONGELADO == estado_actual->bandera_congelado){
+    		    		if(COLOR_SIGUIENTE == estado_actual->bandera_siguiente){
+    		    			estado_actual = estado_actual->bandera_siguiente;
+    		    		}else{
+    		    			estado_actual = estado_actual->estado_anterior;
+    		    		}
+    		    		encender_led(*estado_actual);
+    		    	}
+    		estado_actual->cambiar = FALSE;
     	}
+
 
 
     }
