@@ -59,15 +59,9 @@
 #define SW3_PORT PORTC
 #define SW2_CLOCK_PORT kCLOCK_PortA
 #define SW3_CLOCK_PORT kCLOCK_PortC
+#define SW2_INTERRUPT_FLAG_PIN (1 << SW2_PIN)
+#define SW3_INTERRUPT_FLAG_PIN (1 << SW3_PIN)
 
-
-/* TODO: insert other include files here. */
-
-/* TODO: insert other definitions and declarations here. */
-
-/*
- * @brief   Application entry point.
- */
 
 
 enum {LED_ON, LED_OFF};
@@ -113,6 +107,24 @@ static volatile color color_verde ={
 	 GPIO_PinWrite(GPIOE, LED_GREEN_PIN, Estado.color_del_led.led_verde);
  }
 
+ static estado * estado_actual = 0;
+
+
+
+ void PORTA_IRQHandler(){
+ 	GPIO_ClearPinsInterruptFlags(GPIOA, SW2_INTERRUPT_FLAG_PIN);
+ 	estado_actual->bandera_congelado = CONGELADO;
+ }
+
+ void PORTC_IRQHandler(){
+ 	GPIO_ClearPinsInterruptFlags(GPIOC, SW3_INTERRUPT_FLAG_PIN);
+ 	if(COLOR_SIGUIENTE == estado_actual->bandera_siguiente){
+ 			estado_actual->bandera_siguiente = COLOR_ANTERIOR;
+ 	}else{
+ 		estado_actual->bandera_siguiente = COLOR_SIGUIENTE;
+ 	}
+
+ }
 int main(void) {
 	 estado estado_rojo ;
 
@@ -241,7 +253,7 @@ int main(void) {
    PIT_EnableInterrupts(PIT, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
 
 
-	volatile estado * estado_actual = &estado_rojo;
+	  estado_actual = &estado_rojo;
 
 
     for(;;)	{
