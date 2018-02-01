@@ -112,7 +112,13 @@ static estado * estado_actual = 0;
 void PORTA_IRQHandler()
 {
     GPIO_ClearPinsInterruptFlags(GPIOA, SW2_INTERRUPT_FLAG_PIN);
-    estado_actual->bandera_congelado = CONGELADO;
+    if(NO_CONGELADO == estado_actual->bandera_congelado){
+	    estado_actual->bandera_congelado = CONGELADO;
+   }
+   else
+   {
+	   estado_actual->bandera_congelado = NO_CONGELADO;
+   }
 }
 
 void PORTC_IRQHandler()
